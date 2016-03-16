@@ -1,0 +1,338 @@
+"""
+worker.py - Part of millennium-compact-groups package
+
+Defines Worker object to handle clustering and analysis of individual
+simulation chunk.
+
+Copyright(C) 2016 by
+Trey Wenger; tvwenger@gmail.com
+Chris Wiens; cdw9bf@virginia.edu
+Kelsey Johnson; kej7a@virginia.edu
+
+GNU General Public License v3 (GNU GPLv3)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published
+by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+14 Mar 2016 - TVW Finalized version 1.0
+"""
+_PACK_NAME = 'millennium-compact-groups'
+_PROG_NAME = 'worker.py'
+_VERSION = 'v1.0'
+
+# System utilities
+import sys
+import os
+# Numerical utilities
+import numpy as np
+import pandas
+from sklearn.cluster import MeanShift,DBSCAN
+from scipy.spatial import cKDTree
+# Other utilities
+import millennium_query
+import compact_group
+import cg_logger
+
+class Worker:
+    """
+    Object to handle the organization of a single chunk of the
+    simulation analysis
+    """
+    def __init__(self,username,password,cookies,
+                 snapnum,xbounds,ybounds,zbounds,
+                 get_data=False,cluster=False,
+                 use_dbscan=False,neighborhood=0.05,bandwidth=0.1,
+                 min_members=3,dwarf_range=3.0,crit_velocity=1000.,
+                 annular_radius=1.,max_annular_mass_ratio=0.0001,min_secondtwo_mass_ratio=0.1,
+                 outdir='results',overwrite=False,
+                 verbose=False,nolog=False):
+        #
+        # Function arguments
+        #
+        self.username = username
+        self.password = password
+        self.cookies = cookies
+        self.snapnum = snapnum
+        self.xbounds = xbounds
+        self.ybounds = ybounds
+        self.zbounds = zbounds
+        self.get_data = get_data
+        self.cluster = cluster
+        self.use_dbscan = use_dbscan
+        self.neighborhood = neighborhood
+        self.bandwidth = bandwidth
+        self.min_members = min_members
+        self.dwarf_range = dwarf_range
+        self.crit_velocity = crit_velocity
+        self.annular_radius = annular_radius
+        self.max_annular_mass_ratio = max_annular_mass_ratio
+        self.min_secondtwo_mass_ratio = min_secondtwo_mass_ratio
+        self.overwrite = overwrite
+        #
+        # Set directories and files
+        #
+        directory = os.path.join(outdir,"snapnum_{0:02}".format(self.snapnum))
+        self.datafile = os.path.join(directory,'data','data_{0:02}_{1:02}_{2:02}_{3:02}.csv'.\
+                                     format(self.snapnum,self.xbounds[0],
+                                            self.ybounds[0],self.zbounds[0]))
+        self.clusterfile = os.path.join(directory,'data','cluster_{0:02}_{1:02}_{2:02}_{3:02}.csv'.\
+                                     format(self.snapnum,self.xbounds[0],
+                                            self.ybounds[0],self.zbounds[0]))
+        self.membersfile = os.path.join(directory,'members','members_{0:02}_{1:02}_{2:02}_{3:02}.csv'.\
+                                        format(self.snapnum,self.xbounds[0],
+                                               self.ybounds[0],self.zbounds[0]))
+        self.groupsfile = os.path.join(directory,'groups','groups_{0:02}_{1:02}_{2:02}_{3:02}.csv'.\
+                                       format(self.snapnum,self.xbounds[0],
+                                              self.ybounds[0],self.zbounds[0]))
+        self.all_membersfile = os.path.join(directory,'members','all_members_{0:02}_{1:02}_{2:02}_{3:02}.csv'.\
+                                        format(self.snapnum,self.xbounds[0],
+                                               self.ybounds[0],self.zbounds[0]))
+        self.all_groupsfile = os.path.join(directory,'groups','all_groups_{0:02}_{1:02}_{2:02}_{3:02}.csv'.\
+                                       format(self.snapnum,self.xbounds[0],
+                                              self.ybounds[0],self.zbounds[0]))
+        #
+        # Setup log file
+        #
+        logfile = os.path.join(directory,'log_{0:02}_{1:02}_{2:02}_{3:02}.txt'.\
+                               format(self.snapnum,self.xbounds[0],
+                                      self.ybounds[0],self.zbounds[0]))
+        self.logger = cg_logger.Logger(logfile,nolog=nolog,verbose=verbose)
+        #
+        # Other attributes we will fill
+        #
+        self.data = None
+        self.num_clusters = 0
+        self.groups = []
+        self.good_groups = []
+        self.galaxy_coordinates = None
+    
+    def download_data(self):
+        """
+        Download data for this simulation chunk
+        """
+        # Set up SQL query
+        query = ("SELECT {0} FROM {1} WHERE snapnum={2} "
+                "AND x BETWEEN {3} AND {4} "
+                "AND y BETWEEN {5} AND {6} "
+                "AND z BETWEEN {7} AND {8} "
+                "AND stellarMass > 0 "
+                "AND mag_r < 99")
+        # Columns to download
+        columns=('galaxyID,redshift,x,y,z,velX,velY,velZ,mag_r,mvir,'
+                'stellarMass,type,treeID')
+        # Table to query
+        table = "MPAGalaxies..DeLucia2006a"
+        query = query.format(columns,table,self.snapnum,
+                             self.xbounds[0],self.xbounds[1],
+                             self.ybounds[0],self.ybounds[1],
+                             self.zbounds[0],self.zbounds[1])
+        # Connect and perform query
+        conn = millennium_query.MillenniumQuery(self.username,self.password,
+                                                cookies=self.cookies,
+                                                maxrec=1000000000)
+        conn.query(query)
+        conn.run()
+        conn.wait()
+        # Save the results
+        conn.save(self.datafile)    
+
+    def read_data(self):
+        """
+        Read the data from the file
+        """
+        if not os.path.exists(self.datafile):
+            raise IOError("{0} not found!".format(self.datafile))
+        self.data = pandas.read_csv(self.datafile,header=0,comment='#',
+                                    skip_blank_lines=True,index_col=0)
+        self.galaxy_coordinates = np.array(zip(self.data['x'],
+                                               self.data['y'],
+                                               self.data['z']))
+
+    def dbscan(self):
+        """
+        Use DBSCAN to perform clustering in this chunk
+        """
+        # Set up DBSCAN
+        db = DBSCAN(eps=self.neighborhood,
+                    min_samples=self.min_members)
+        # Perform the clustering
+        db.fit(self.galaxy_coordinates)
+        # save the labels
+        np.savetxt(self.clusterfile,db.labels_,fmt='%d')
+
+    def mean_shift(self):
+        """
+        Use MeanShift to perform clustering in this chunk
+        """
+        # Set up MeanShift
+        ms = MeanShift(bandwidth=self.bandwidth,
+                       min_bin_freq=self.min_members,
+                       cluster_all=False)
+        # Perform the clustering
+        ms.fit(self.galaxy_coordinates)
+        # save the labels
+        np.savetxt(self.clusterfile,ms.labels_,fmt='%d')
+
+    def read_cluster(self):
+        """
+        Read the saved clustering information, add column to data
+        """
+        labels = np.loadtxt(self.clusterfile,dtype=int)
+        self.data['cluster'] = labels
+        self.num_clusters = len(np.unique(labels))
+
+    def analyze_groups(self):
+        """
+        Create CompactGroup object for each discovered group, measure
+        their properties
+        """
+        labels_unique = np.unique(self.data['cluster'])
+        #
+        # Build a KD-Tree to perform neighborhood analyses
+        # 
+        # leafsize=15 gives best timing results from
+        # https://jakevdp.github.io/blog/2013/04/29/benchmarking-nearest-neighbor-searches-in-python/
+        kdTree = cKDTree(self.galaxy_coordinates,leafsize=15)
+        for l_ind,label in enumerate(labels_unique):
+            # skip label -1 (ungrouped)
+            if label == -1:
+                continue
+            #
+            # Perform some basic calculations
+            #
+            # update label so it is unique to this snapnum+chunk
+            mylabel = '{0:02}_{1:02}_{2:02}_{3:02}_{4:05}'.\
+              format(self.snapnum,self.xbounds[0],self.ybounds[0],self.zbounds[0],l_ind)
+            # get all members of this group
+            members = self.data.loc[self.data.cluster == label].copy()
+            # create object
+            cg = compact_group.CompactGroup(mylabel,members)
+            self.logger.log('{0} has {1} members.'.format(cg.label,len(cg.members)))
+            # identify dwarf galaxies
+            cg.find_dwarfs(self.dwarf_range)
+            self.logger.log('{0} has {1} dwarf galaxies.'.format(cg.label,np.sum(cg.members['is_dwarf'])))
+            # calculate median velocity
+            cg.calc_median_velocity()
+            self.logger.log('{0} median velocity: {1} km/s.'.format(cg.label,cg.median_vel))
+            # identify high-velocity "fly-by"s
+            cg.find_flybys(self.crit_velocity)
+            self.logger.log('{0} has {1} fly-by galaxies.'.format(cg.label,np.sum(cg.members['is_flyby'])))
+            # calculate mediod of group
+            cg.calc_mediod()
+            self.logger.log('{0} mediod: {1}.'.format(cg.label,cg.mediod))
+            # calculate radius of group
+            cg.calc_radius()
+            self.logger.log('{0} radius: {1}.'.format(cg.label,cg.radius))
+            #calculate average virial mass
+            cg.calc_avg_mvir()
+            self.logger.log('{0} avg_mvir: {1}.'.format(cg.label,cg.avg_mvir))
+            #calculate average stellar mass
+            cg.calc_avg_stellarmass()
+            self.logger.log('{0} avg_stellarmass: {1}.'.format(cg.label,cg.avg_stellarmass))
+            #
+            # Query KD-Tree for number of neighbors within radius
+            # of this group's center
+            #
+            neighbors_ind = kdTree.query_ball_point(cg.mediod,
+                                                    self.annular_radius)
+            #
+            # Exclude galaxies from neighbors list if they are
+            # members of the group
+            #
+            neighbors_ind = [i for i in neighbors_ind
+                            if self.data.index[i] not in cg.members.index.tolist()]
+            # Save neighbors
+            cg.neighbors = self.data.iloc[neighbors_ind]
+            self.logger.log('{0} has {1} neighbors.'.format(cg.label,len(cg.neighbors)))
+            #
+            # Calculate the ratio of mass in an annulus outside of
+            # the compact group and the total mass within a radius
+            #
+            cg.calc_annular_mass_ratio(self.annular_radius)
+            self.logger.log('{0} annular_mass_ratio: {1}.'.format(cg.label,cg.annular_mass_ratio))
+            #
+            # Calculate the ratio of virial masses of the second two
+            # largest members to the largest member
+            #
+            cg.calc_secondtwo_mass_ratio()
+            self.logger.log('{0} secondtwo_mass_ratio: {1}.'.format(cg.label,cg.annular_mass_ratio))
+            # add it to the list of groups in this chunk
+            self.groups.append(cg)
+
+    def filter_groups(self):
+        """
+        Filter out bad groups and save only good groups
+        """
+        mins = np.array([self.xbounds[0],self.ybounds[0],self.zbounds[0]])
+        maxs = np.array([self.xbounds[1],self.ybounds[1],self.zbounds[1]])
+        for cg in self.groups:
+            # If the group has less than min_members non-dwarf, non-flyby galaxies,
+            # it's bad
+            if np.sum((~cg.members['is_dwarf'])|(~cg.members['is_flyby'])) < self.min_members:
+                self.logger.log('{0} eliminated because not enough members.'.format(cg.label))
+                continue
+            # If within annulus radius of the edge of the chunk,
+            # it's bad
+            if (np.any((cg.mediod-self.annular_radius) < mins) or
+                np.any((cg.mediod+self.annular_radius) > maxs)):
+                self.logger.log('{0} eliminated because too close to edge.'.format(cg.label))
+                continue
+            # If the annular mass to total mass ratio is more than
+            # ax_annular_mass_ratio, it's bad
+            if cg.annular_mass_ratio > self.max_annular_mass_ratio:
+                self.logger.log('{0} eliminated because annular_mass_ratio too large.'.format(cg.label))
+                continue
+            # If the ratio of the virial mass of the 2nd+3rd most
+            # massive members to that of the most massive member
+            # is less than min_secondtwo_mass_ratio, it's bad
+            if cg.secondtwo_mass_ratio < self.min_secondtwo_mass_ratio:
+                self.logger.log('{0} eliminated because secondtwo_mass_ratio too small.'.format(cg.label))
+                continue
+            # If we made it this far, we have a "good" group
+            self.logger.log('{0} is a good_group'.format(cg.label))
+            self.good_groups.append(cg)
+
+    def save(self):
+        """
+        Save group and member statistics to file
+        """
+        # Save group statistics
+        filenames = [self.groupsfile,self.all_groupsfile]
+        groups = [self.good_groups,self.groups]
+        for filename,group in zip(filenames,groups):
+            with open(filename,'w') as f:
+                f.write("group_id,x,y,z,radius,median_vel,num_members,avg_mvir,avg_stellarMass,galaxies_near,annular_mass_ratio,secondtwo_mass_ratio\n")
+                for cg in group:
+                    f.write("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11}\n".\
+                            format(cg.label,cg.mediod[0],cg.mediod[1],
+                                cg.mediod[2],cg.radius,cg.median_vel,
+                                len(cg.members),cg.avg_mvir,
+                                cg.avg_stellarmass,len(cg.neighbors),
+                                cg.annular_mass_ratio,cg.secondtwo_mass_ratio))
+        # Save member statistics
+        filenames = [self.membersfile,self.all_membersfile]
+        groups = [self.good_groups,self.groups]
+        for filename,group in zip(filenames,groups):
+            with open(filename,'w') as f:
+                f.write("group_id,member_id,x,y,z,velX,velY,velZ,vel,mag_r,mvir,stellarMass,treeID,is_dwarf,is_flyby\n")
+                for cg in group:
+                    for index,member in cg.members.iterrows():
+                        f.write("{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10},{11},{12}\n".\
+                                format(cg.label,index,
+                                    member['x'],member['y'],
+                                    member['z'],member['velX'],
+                                    member['velY'],member['velZ'],
+                                    member['vel'],member['mag_r'],
+                                    member['mvir'],member['stellarMass'],
+                                    member['treeID'],
+                                    member['is_dwarf'],member['is_flyby']))
