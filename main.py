@@ -39,7 +39,7 @@ import traceback
 import numpy as np
 # Other utilities
 import multiprocessing as mp
-import IPython.parallel as ipp
+import ipyparallel as ipp
 import itertools
 # Classes for this project
 import millennium_query
