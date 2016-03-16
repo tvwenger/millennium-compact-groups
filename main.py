@@ -255,7 +255,6 @@ def main(username,password,
               format(len(pool)))
         jobs = pool.map_async(run_worker,jobs)
         jobs.wait_interactive()
-        pool.join()
         rc.shutdown(hub=True)
     #
     # Set up multiprocessing
