@@ -253,7 +253,7 @@ def main(username,password,
               format(len(engines)))
         balancer = engines.load_balanced_view()
         balancer.block = False
-        results = pool.map(run_worker,jobs)
+        results = balancer.map(run_worker,jobs)
         while not results.ready():
             time.sleep(1)
     #
