@@ -254,7 +254,8 @@ def main(username,password,
         logger.log("Found {0} tasks available to run simultaneously".\
               format(len(pool)))
         jobs = pool.map_async(run_worker,args)
-        pool.wait(jobs=jobs)
+        while not pool.wait(jobs=jobs):
+            time.sleep(1)
     #
     # Set up multiprocessing
     #
