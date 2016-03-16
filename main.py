@@ -257,6 +257,7 @@ def main(username,password,
         pool.close()
         jobs.wait_interactive()
         pool.join()
+        rc.shutdown(hub=True)
     #
     # Set up multiprocessing
     #
