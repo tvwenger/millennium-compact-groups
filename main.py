@@ -225,11 +225,11 @@ def main(username,password,
     #
     # Set up worker pool
     #
-    args = []
+    jobs = []
     for snapnum,xbounds,ybounds,zbounds in \
       itertools.product(snapnums,boundaries,boundaries,boundaries):
         # Set-up a new Worker
-        arg = worker.Worker(username,password,cookies,
+        job = worker.Worker(username,password,cookies,
                             snapnum,xbounds,ybounds,zbounds,
                             get_data=get_data,cluster=cluster,
                             use_dbscan=use_dbscan,neighborhood=neighborhood,bandwidth=bandwidth,
@@ -240,21 +240,21 @@ def main(username,password,
                             outdir=outdir,overwrite=overwrite,
                             verbose=verbose,nolog=nolog)
         # Append to list of worker arguments
-        args.append(arg)
+        jobs.append(job)
         logger.log('Created worker for snapnum: {0}, xmin: {1}, ymin: {2}, zmin: {3}'.format(snapnum,xbounds[0],ybounds[0],zbounds[0]))
-    logger.log("Found {0} tasks to process".format(len(args)))
+    logger.log("Found {0} tasks to process".format(len(jobs)))
     #
     # Set up IPython.parallel
     #
     if profile is not None:
         logger.log("Using IPython.parallel")
-        rc = ipp.Client(profile=profile,block=False)
-        pool = rc.load_balanced_view()
-        pool.block = False
-        logger.log("Found {0} tasks available to run simultaneously".\
-              format(len(pool)))
-        jobs = pool.map(run_worker,args)
-        while not jobs.ready():
+        engines = ipp.Client(profile=profile,block=False)
+        logger.log("Found {0} IPython.parallel engines".\
+              format(len(engines)))
+        balancer = engines.load_balanced_view()
+        balancer.block = False
+        results = pool.map(run_worker,jobs)
+        while not results.ready():
             time.sleep(1)
     #
     # Set up multiprocessing
@@ -262,7 +262,7 @@ def main(username,password,
     elif num_cpus > 1:
         logger.log("Using multiprocessing with {0} cpus".format(num_cpus))
         pool = mp.Pool(num_cpus)
-        jobs = pool.map_async(run_worker,args)
+        results = pool.map_async(run_worker,jobs)
         pool.close()
         pool.join()
     #
@@ -270,8 +270,8 @@ def main(username,password,
     #
     else:
         logger.log("Not using parallel processing.")
-        for arg in args:
-            run_worker(arg)
+        for job in jobs:
+            run_worker(job)
     logger.log("All jobs done.")
     #
     # Clean up
