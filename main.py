@@ -242,7 +242,7 @@ def main(username,password,
         # Append to list of worker arguments
         jobs.append(job)
         logger.log('Created worker for snapnum: {0}, xmin: {1}, ymin: {2}, zmin: {3}'.format(snapnum,xbounds[0],ybounds[0],zbounds[0]))
-    logger.log("Found {0} tasks to process".format(len(jobs)))
+    logger.log("Found {0} jobs".format(len(jobs)))
     #
     # Set up IPython.parallel
     #
@@ -254,8 +254,7 @@ def main(username,password,
         balancer = engines.load_balanced_view()
         balancer.block = False
         results = balancer.map(run_worker,jobs)
-        while not results.ready():
-            time.sleep(1)
+        results.wait()
     #
     # Set up multiprocessing
     #

@@ -103,9 +103,10 @@ class Worker:
         #
         # Setup log file
         #
-        logfile = os.path.join(directory,'log_{0:02}_{1:02}_{2:02}_{3:02}.txt'.\
+        logfile = os.path.join(directory,'log_{0:02}_{1:02}_{2:02}_{3:02}_{4}.txt'.\
                                format(self.snapnum,self.xbounds[0],
-                                      self.ybounds[0],self.zbounds[0]))
+                                      self.ybounds[0],self.zbounds[0],
+                                      time.strftime('%Y-%m-%d_%H-%M-%S')))
         self.logger = cg_logger.Logger(logfile,nolog=nolog,verbose=verbose)
         #
         # Other attributes we will fill
