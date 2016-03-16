@@ -151,7 +151,7 @@ def main(username,password,
     # Handle test case
     #
     if test:
-        snapnums = [60]
+        snapnums = range(50,61)
         size = 100.
     #
     # Open main log file
@@ -372,7 +372,7 @@ if __name__ == "__main__":
     parser.add_argument('--nolog',action='store_true',
                         help="Do not save log files")
     parser.add_argument('--test',action='store_true',
-                        help="Run a test on one chunk. (snapnum=60, box=0,0,0, size=100)")
+                        help="Run a test on one chunk. (snapnum=50-60, box=0,0,0, size=100)")
     #
     # Parse the arguments and send to main function
     #
