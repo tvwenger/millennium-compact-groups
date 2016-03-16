@@ -254,7 +254,6 @@ def main(username,password,
         logger.log("Found {0} tasks available to run simultaneously".\
               format(len(pool)))
         jobs = pool.map_async(run_worker,jobs)
-        pool.close()
         jobs.wait_interactive()
         pool.join()
         rc.shutdown(hub=True)
