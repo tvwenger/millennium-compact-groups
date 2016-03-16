@@ -247,7 +247,7 @@ def main(username,password,
     # Set up IPython.parallel
     #
     if profile is not None:
-        loger.log("Using IPython.parallel")
+        logger.log("Using IPython.parallel")
         rc = ipp.Client(profile=profile,block=False)
         pool = rc.load_balanced_view()
         pool.block = False
