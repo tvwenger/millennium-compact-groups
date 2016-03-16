@@ -33,6 +33,7 @@ _VERSION = 'v1.0'
 # System utilities
 import sys
 import os
+import time
 # Numerical utilities
 import numpy as np
 import pandas
