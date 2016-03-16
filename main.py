@@ -225,11 +225,11 @@ def main(username,password,
     #
     # Set up worker pool
     #
-    jobs = []
+    args = []
     for snapnum,xbounds,ybounds,zbounds in \
       itertools.product(snapnums,boundaries,boundaries,boundaries):
         # Set-up a new Worker
-        job = worker.Worker(username,password,cookies,
+        arg = worker.Worker(username,password,cookies,
                             snapnum,xbounds,ybounds,zbounds,
                             get_data=get_data,cluster=cluster,
                             use_dbscan=use_dbscan,neighborhood=neighborhood,bandwidth=bandwidth,
@@ -240,9 +240,9 @@ def main(username,password,
                             outdir=outdir,overwrite=overwrite,
                             verbose=verbose,nolog=nolog)
         # Append to list of worker arguments
-        jobs.append(job)
+        args.append(arg)
         logger.log('Created worker for snapnum: {0}, xmin: {1}, ymin: {2}, zmin: {3}'.format(snapnum,xbounds[0],ybounds[0],zbounds[0]))
-    logger.log("Found {0} tasks to process".format(len(jobs)))
+    logger.log("Found {0} tasks to process".format(len(args)))
     #
     # Set up IPython.parallel
     #
@@ -253,17 +253,16 @@ def main(username,password,
         pool.block = False
         logger.log("Found {0} tasks available to run simultaneously".\
               format(len(pool)))
-        jobs = pool.map_async(run_worker,jobs)
-        while not jobs.ready():
-            time.sleep(1)
-        rc.shutdown(hub=True)
+        jobs = pool.map_async(run_worker,args)
+        pool.wait(jobs=jobs)
+        pool.shutdown(hub=True)
     #
     # Set up multiprocessing
     #
     elif num_cpus > 1:
         logger.log("Using multiprocessing with {0} cpus".format(num_cpus))
         pool = mp.Pool(num_cpus)
-        jobs = pool.map_async(run_worker,jobs)
+        jobs = pool.map_async(run_worker,args)
         pool.close()
         pool.join()
     #
@@ -271,8 +270,8 @@ def main(username,password,
     #
     else:
         logger.log("Not using parallel processing.")
-        for job in jobs:
-            run_worker(job)
+        for arg in args:
+            run_worker(arg)
     logger.log("All jobs done.")
     #
     # Clean up
