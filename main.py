@@ -46,96 +46,11 @@ import millennium_query
 import cg_logger
 import worker
 
-def run_worker(w):
-    """
-    Downloads this simulation chunk, performs clustering and
-    other analysis
-    """
-    try:
-        start_time = time.time()
-        w.logger.log("Working on snapnum: {0}, Box {1}, {2}, {3}".\
-            format(w.snapnum,w.xbounds[0],w.ybounds[0],w.zbounds[0]))
-        # If the member file and group file for this chunk already
-        # exists and we are not overwriting, we're done!
-        if ((os.path.exists(w.groupsfile) and os.path.exists(w.membersfile) and
-            os.path.exists(w.all_groupsfile) and os.path.exists(w.all_membersfile)
-            and not w.overwrite)):
-            w.logger.log('Found {0} and {1}. Returning.'.format(w.groupsfile,w.membersfile))
-            return
-        #
-        # If data exists and we're asked to overwrite it, or if data
-        # doesn't exists, download it
-        #
-        if ((os.path.exists(w.datafile) and w.get_data) or
-            (not os.path.exists(w.datafile))):
-            w.logger.log('Downloading data.')
-            w.download_data()
-            w.logger.log('Done.')
-        #
-        # Read in the data
-        #
-        w.logger.log('Reading data.')
-        w.read_data()
-        w.logger.log('Done.')
-        if len(w.data) == 0:
-            # No galaxies found. We're done!
-            w.logger.log('No galaxies found. Returning.')
-            return
-        #
-        # Perform clustering
-        #
-        if (w.cluster or not os.path.exists(w.clusterfile)):
-            w.logger.log('Performing clustering.')
-            if w.use_dbscan:
-                w.logger.log('Using DBSCAN.')
-                w.dbscan()
-            else:
-                w.logger.log('Using MeanShift.')
-                w.mean_shift()
-            w.logger.log('Done.')
-        #
-        # Read cluster results
-        #
-        w.logger.log('Reading cluster results.')
-        w.read_cluster()
-        w.logger.log('Done.')
-        # num-1 here accounts for the "-1" ungrouped cluster
-        w.logger.log('Found {0} clusters.'.format(w.num_clusters-1))
-        #
-        # Measure the discovered groups' properties
-        #
-        w.logger.log('Analyzing groups.')
-        w.analyze_groups()
-        w.logger.log('Done.')
-        #
-        # Filter groups 
-        #
-        w.logger.log('Filtering groups.')
-        w.filter_groups()
-        w.logger.log('Done.')
-        #
-        # Save the group and member statistics
-        #
-        w.logger.log('Saving group and member statistics.')
-        w.save()
-        w.logger.log('Done.')
-        # calculate run-time
-        time_diff = time.time() - start_time
-        hours = int(time_diff/3600.)
-        mins = int((time_diff - hours*3600.)/60.)
-        secs = time_diff - hours*3600. - mins*60.
-        w.logger.log("Runtime: {0}h {1}m {2:.2f}s".format(hours,mins,secs))
-    except Exception as e:
-        w.logger.log("Caught exception in snapnum: {0}, Box {1},{2},{3}".\
-            format(w.snapnum,w.xbounds[0],w.ybounds[0],w.zbounds[0]))
-        traceback.print_exc()
-        raise e
-
 def main(username,password,
-         get_data=False,snapnums=range(64),size=100.,
+         get_data=False,snapnums=np.arange(64),size=100.,
          cluster=False,
          use_dbscan=False,neighborhood=0.05,bandwidth=0.1,
-         min_members=3,dwarf_range=3.0,crit_velocity=1000.,
+         min_members=3,dwarf_limit=0.05,crit_velocity=1000.,
          annular_radius=1.,max_annular_mass_ratio=0.0001,min_secondtwo_mass_ratio=0.1,
          num_cpus=1,profile=None,
          outdir='results',overwrite=False,
@@ -151,12 +66,12 @@ def main(username,password,
     # Handle test case
     #
     if test:
-        snapnums = range(50,61)
+        snapnums = np.array([50])
         size = 100.
     #
     # Open main log file
     #
-    logfile = os.path.join(outdir,'log_{0}.txt'.format(time.strftime('%Y-%m-%d_%H-%M-%S')))
+    logfile = os.path.join(outdir,'log_{0}.txt'.format(time.strftime('%Y%m%d%H%M%S')))
     logger = cg_logger.Logger(logfile,nolog=nolog,verbose=verbose)
     logger.log("Using the following parameters:")
     logger.log("username: {0}".format(username))
@@ -168,7 +83,7 @@ def main(username,password,
     logger.log("neighborhood: {0}".format(neighborhood))
     logger.log("bandwidth: {0}".format(bandwidth))
     logger.log("min_members: {0}".format(min_members))
-    logger.log("dwarf_range: {0}".format(dwarf_range))
+    logger.log("dwarf_limit: {0}".format(dwarf_limit))
     logger.log("crit_velocity: {0}".format(crit_velocity))
     logger.log("annular_radius: {0}".format(annular_radius))
     logger.log("max_annular_mass_ratio: {0}".format(max_annular_mass_ratio))
@@ -183,7 +98,7 @@ def main(username,password,
     # Set up output directories
     #
     for snapnum in snapnums:
-        directory = os.path.join(outdir,"snapnum_{0:02}".\
+        directory = os.path.join(outdir,"snapnum_{0:02g}".\
                                  format(snapnum))
         if not os.path.isdir(directory):
             os.mkdir(directory)
@@ -221,7 +136,7 @@ def main(username,password,
     mins[mins < 0.] = 0.
     maxs = maxs + annular_radius
     maxs[maxs > 500.] = 500.
-    boundaries = zip(mins,maxs)
+    boundaries = list(zip(mins,maxs))
     #
     # Set up worker pool
     #
@@ -233,7 +148,7 @@ def main(username,password,
                             snapnum,xbounds,ybounds,zbounds,
                             get_data=get_data,cluster=cluster,
                             use_dbscan=use_dbscan,neighborhood=neighborhood,bandwidth=bandwidth,
-                            min_members=min_members,dwarf_range=dwarf_range,
+                            min_members=min_members,dwarf_limit=dwarf_limit,
                             crit_velocity=crit_velocity,annular_radius=annular_radius,
                             max_annular_mass_ratio=max_annular_mass_ratio,
                             min_secondtwo_mass_ratio=min_secondtwo_mass_ratio,
@@ -241,8 +156,9 @@ def main(username,password,
                             verbose=verbose,nolog=nolog)
         # Append to list of worker arguments
         jobs.append(job)
-        logger.log('Created worker for snapnum: {0}, xmin: {1}, ymin: {2}, zmin: {3}'.format(snapnum,xbounds[0],ybounds[0],zbounds[0]))
-    logger.log("Found {0} tasks to process".format(len(jobs)))
+        logger.log('Created worker for snapnum: {0:02g}, xmin: {1:03g}, ymin: {2:03g}, zmin: {3:03g}'.\
+                   format(snapnum,xbounds[0],ybounds[0],zbounds[0]))
+    logger.log("Found {0} jobs".format(len(jobs)))
     #
     # Set up IPython.parallel
     #
@@ -253,16 +169,19 @@ def main(username,password,
               format(len(engines)))
         balancer = engines.load_balanced_view()
         balancer.block = False
-        results = pool.map(run_worker,jobs)
-        while not results.ready():
-            time.sleep(1)
+        results = balancer.map(worker.run_worker,jobs)
+        try:
+            results.get()
+        except Exception as e:
+            logger.log("Caught exception")
+            logger.log(traceback.format_exc())
     #
     # Set up multiprocessing
     #
     elif num_cpus > 1:
         logger.log("Using multiprocessing with {0} cpus".format(num_cpus))
         pool = mp.Pool(num_cpus)
-        results = pool.map_async(run_worker,jobs)
+        results = pool.map_async(worker.run_worker,jobs)
         pool.close()
         pool.join()
     #
@@ -271,7 +190,7 @@ def main(username,password,
     else:
         logger.log("Not using parallel processing.")
         for job in jobs:
-            run_worker(job)
+            worker.run_worker(job)
     logger.log("All jobs done.")
     #
     # Clean up
@@ -304,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument('--get_data',action='store_true',
                         help='Re-download simulation data even if it already exists.')
     parser.add_argument('--snapnums',nargs="+",type=int,
-                        default=range(64),
+                        default=np.arange(64),
                         help="snapnums to process. Default: All (0 to 63)")
     parser.add_argument('--size',type=int,
                         default=100,
@@ -325,10 +244,9 @@ if __name__ == "__main__":
     #
     parser.add_argument('--min_members',type=int,default=3,
                         help='Minimum members to be considered a group. Default: 3')
-    parser.add_argument('--dwarf_range',type=float,default=3.0,
-                        help=('Magnitude difference from brightest '
-                              'group galaxy to be considered a dwarf. '
-                              'Default: 3.0'))
+    parser.add_argument('--dwarf_limit',type=float,default=0.05,
+                        help=('Stellar mass limit for dwarf galaxies in '
+                               '10^10 Msun/h. Default: 0.05'))
     parser.add_argument('--crit_velocity',type=float,default=1000.0,
                         help=('Velocity difference (km/s) between a '
                               'galaxy and median group velocity to '
@@ -380,7 +298,7 @@ if __name__ == "__main__":
          get_data=args.get_data,snapnums=args.snapnums,size=args.size,
          cluster=args.cluster,
          use_dbscan=args.use_dbscan,neighborhood=args.neighborhood,bandwidth=args.bandwidth,
-         min_members=args.min_members,dwarf_range=args.dwarf_range,
+         min_members=args.min_members,dwarf_limit=args.dwarf_limit,
          crit_velocity=args.crit_velocity,annular_radius=args.annular_radius,
          max_annular_mass_ratio=args.max_annular_mass_ratio,min_secondtwo_mass_ratio=args.min_secondtwo_mass_ratio,
          num_cpus=args.num_cpus,profile=args.profile,

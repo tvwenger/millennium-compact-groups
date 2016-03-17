@@ -57,17 +57,14 @@ class CompactGroup:
         self.annular_mass_ratio = 0.0
         self.secondtwo_mass_ratio = 0.0
 
-    def find_dwarfs(self,dwarf_range):
+    def find_dwarfs(self,dwarf_limit):
         """
-        Find galaxies that have a magnitude greater than
-        dwarf_range from the brightest group galaxy
+        Find galaxies that have a stellar mass less than dwarf_limit
         """
         # add a is_dwarf column to members
         self.members['is_dwarf'] = np.zeros(len(self.members),dtype=bool)
-        # get minimum magnitude (brightest galaxy)
-        min_mag = np.min(self.members['mag_r'])
         # assign dwarfs
-        ind = self.members['mag_r'] > min_mag + dwarf_range
+        ind = self.members['stellarMass'] < dwarf_limit
         self.members.ix[ind,'is_dwarf'] = True
 
     def calc_median_velocity(self):
@@ -94,35 +91,43 @@ class CompactGroup:
         
     def calc_mediod(self):
         """
-        Calculate the mediod center of this group
+        Calculate the mediod center of this group, excluding
+        dwarfs and flybys
         """
-        x_med = np.median(self.members['x'])
-        y_med = np.median(self.members['y'])
-        z_med = np.median(self.members['z'])
+        good = ((~self.members['is_dwarf'])&(~self.members['is_flyby']))
+        x_med = np.median(self.members['x'][good])
+        y_med = np.median(self.members['y'][good])
+        z_med = np.median(self.members['z'][good])
         self.mediod = np.array([x_med,y_med,z_med])
 
     def calc_radius(self):
         """
         Calculate the radius of this group, defined as the
-        maximum galaxy distance from the mediod
+        maximum galaxy distance from the mediod, excluding
+        dwarfs and flybys
         """
-        xdist = self.members['x']-self.mediod[0]
-        ydist = self.members['y']-self.mediod[1]
-        zdist = self.members['z']-self.mediod[2]
+        good = ((~self.members['is_dwarf'])&(~self.members['is_flyby']))
+        xdist = self.members['x'][good]-self.mediod[0]
+        ydist = self.members['y'][good]-self.mediod[1]
+        zdist = self.members['z'][good]-self.mediod[2]
         dists = (xdist*xdist + ydist*ydist + zdist*zdist)**0.5
         self.radius = np.max(dists)
 
     def calc_avg_mvir(self):
         """
         Calculate the average virial mass of galaxies in this group
+        excluding dwafs and flybys
         """
-        self.avg_mvir = np.mean(self.members['mvir'])
+        good = ((~self.members['is_dwarf'])&(~self.members['is_flyby']))
+        self.avg_mvir = np.mean(self.members['mvir'][good])
 
     def calc_avg_stellarmass(self):
         """
         Calculate the average stellar mass of galaxies in this group
+        excluding dwafs and flybys
         """
-        self.avg_stellarmass = np.mean(self.members['stellarMass'])
+        good = ((~self.members['is_dwarf'])&(~self.members['is_flyby']))
+        self.avg_stellarmass = np.mean(self.members['stellarMass'][good])
 
     def calc_annular_mass_ratio(self,radius):
         """
