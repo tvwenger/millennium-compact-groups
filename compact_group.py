@@ -71,12 +71,13 @@ class CompactGroup:
         """
         Calculate the median velocity of galaxies in this group
         """
+        good = (~self.members['is_dwarf'])
         vels = (self.members['velX']*self.members['velX'] +
                 self.members['velY']*self.members['velY'] +
                 self.members['velZ']*self.members['velZ'])**0.5
         # add a velocity2 column to members
         self.members['vel'] = vels
-        self.median_vel = np.median(vels)
+        self.median_vel = np.median(vels[good])
         
     def find_flybys(self,crit_velocity):
         """
