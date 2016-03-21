@@ -107,7 +107,7 @@ def main(username,password,
         mystring = "{0:02g}_{1:03g}_{2:03g}_{3:03g}".\
           format(snapnum,xbounds[0],ybounds[0],zbounds[0])
         datafile = os.path.join(outdir,'snapnum_{0:02g}'.format(snapnum),
-                                'data','data_{0}.csv'.format(mystring))
+                                'data_{0}.csv'.format(mystring))
         # Check if file already exists
         if os.path.exists(datafile) and not overwrite:
             print("Found: ({0}/{1}) - {2}".format(num,total,mystring))
@@ -126,6 +126,9 @@ def main(username,password,
         conn.wait()
         # Save the results
         conn.save(datafile)
+        # Delete and close the connection
+        conn.delete()
+        conn.close()
         print("Downloaded: ({0}/{1}) - {2} - Runtime: {3:.2f}s".format(num,total,mystring,time.time()-job_time))
     #
     # Clean up
