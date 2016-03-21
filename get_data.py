@@ -54,13 +54,9 @@ def main(username,password,
     # Set up output directories
     #
     for snapnum in snapnums:
-        directory = os.path.join(outdir,"snapnum_{0:02g}".\
-                                 format(snapnum))
+        directory = os.path.join(outdir,"snapnum_{0:02g}".format(snapnum))
         if not os.path.isdir(directory):
             os.mkdir(directory)
-        data_directory = os.path.join(directory,'data')
-        if not os.path.isdir(data_directory):
-            os.mkdir(data_directory)
     #
     # Get Millennium Simulation cookies
     #

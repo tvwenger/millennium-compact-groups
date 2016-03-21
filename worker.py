@@ -65,11 +65,9 @@ def run_worker(w):
         # If data exists and we're asked to overwrite it, or if data
         # doesn't exists, download it
         #
-        if ((os.path.exists(w.datafile) and w.get_data) or
-            (not os.path.exists(w.datafile))):
-            w.logger.log('Downloading data.')
-            w.download_data()
-            w.logger.log('Done.')
+        if not os.path.exists(w.datafile):
+            raise ValueError("Data file does not exist for snapnum: {0:02g}, Box {1:03g}, {2:03g}, {3:03g}".\
+              format(w.snapnum,w.xbounds[0],w.ybounds[0],w.zbounds[0]))
         #
         # Read in the data
         #
@@ -135,25 +133,20 @@ class Worker:
     Object to handle the organization of a single chunk of the
     simulation analysis
     """
-    def __init__(self,username,password,cookies,
-                 snapnum,xbounds,ybounds,zbounds,
-                 get_data=False,cluster=False,
+    def __init__(self,snapnum,xbounds,ybounds,zbounds,
+                 cluster=False,
                  use_dbscan=False,neighborhood=0.05,bandwidth=0.1,
                  min_members=3,dwarf_limit=0.05,crit_velocity=1000.,
                  annular_radius=1.,max_annular_mass_ratio=0.0001,min_secondtwo_mass_ratio=0.1,
-                 outdir='results',overwrite=False,
+                 datadir='data',outdir='results',overwrite=False,
                  verbose=False,nolog=False):
         #
         # Function arguments
         #
-        self.username = username
-        self.password = password
-        self.cookies = cookies
         self.snapnum = snapnum
         self.xbounds = xbounds
         self.ybounds = ybounds
         self.zbounds = zbounds
-        self.get_data = get_data
         self.cluster = cluster
         self.use_dbscan = use_dbscan
         self.neighborhood = neighborhood
@@ -171,7 +164,8 @@ class Worker:
         my_string = "{0:02g}_{1:03g}_{2:03g}_{3:03g}".\
           format(self.snapnum,self.xbounds[0],self.ybounds[0],self.zbounds[0])
         directory = os.path.join(outdir,"snapnum_{0:02g}".format(self.snapnum))
-        self.datafile = os.path.join(directory,'data','data_{0}.csv'.format(my_string))
+        self.datafile = os.path.join(datadir,'snapnum_{0:02g}'.format(self.snapnum),
+                                     'data_{0}.csv'.format(my_string))
         self.clusterfile = os.path.join(directory,'data','cluster_{0}.csv'.format(my_string))
         self.membersfile = os.path.join(directory,'members','members_{0}.csv'.format(my_string))
         self.groupsfile = os.path.join(directory,'groups','groups_{0}.csv'.format(my_string))
@@ -192,36 +186,6 @@ class Worker:
         self.good_groups = []
         self.galaxy_coordinates = None
     
-    def download_data(self):
-        """
-        Download data for this simulation chunk
-        """
-        # Set up SQL query
-        query = ("SELECT {0} FROM {1} WHERE snapnum={2} "
-                "AND x BETWEEN {3} AND {4} "
-                "AND y BETWEEN {5} AND {6} "
-                "AND z BETWEEN {7} AND {8} "
-                "AND stellarMass > 0 "
-                "AND mag_r < 99")
-        # Columns to download
-        columns=('galaxyID,redshift,x,y,z,velX,velY,velZ,mag_r,mvir,'
-                'stellarMass,type,treeID')
-        # Table to query
-        table = "MPAGalaxies..DeLucia2006a"
-        query = query.format(columns,table,self.snapnum,
-                             self.xbounds[0],self.xbounds[1],
-                             self.ybounds[0],self.ybounds[1],
-                             self.zbounds[0],self.zbounds[1])
-        # Connect and perform query
-        conn = millennium_query.MillenniumQuery(self.username,self.password,
-                                                cookies=self.cookies,
-                                                maxrec=1000000000)
-        conn.query(query)
-        conn.run()
-        conn.wait()
-        # Save the results
-        conn.save(self.datafile)    
-
     def read_data(self):
         """
         Read the data from the file

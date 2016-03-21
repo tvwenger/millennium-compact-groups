@@ -42,22 +42,20 @@ import multiprocessing as mp
 import ipyparallel as ipp
 import itertools
 # Classes for this project
-import millennium_query
 import cg_logger
 import worker
 
-def main(username,password,
-         get_data=False,snapnums=np.arange(64),size=100.,
+def main(snapnums=np.arange(64),size=100.,
          cluster=False,
          use_dbscan=False,neighborhood=0.05,bandwidth=0.1,
          min_members=3,dwarf_limit=0.05,crit_velocity=1000.,
          annular_radius=1.,max_annular_mass_ratio=0.0001,min_secondtwo_mass_ratio=0.1,
          num_cpus=1,profile=None,
-         outdir='results',overwrite=False,
+         datadir='data',outdir='results',overwrite=False,
          verbose=False,nolog=False,test=False):
     """
-    Set up workers to download simulation chunks, perform clustering,
-    and calculate group and member statistics  
+    Set up workers to perform clustering and calculate group and
+    member statistics  
     """
     start_time = time.time()
     if not os.path.isdir(outdir):
@@ -74,8 +72,6 @@ def main(username,password,
     logfile = os.path.join(outdir,'log_{0}.txt'.format(time.strftime('%Y%m%d%H%M%S')))
     logger = cg_logger.Logger(logfile,nolog=nolog,verbose=verbose)
     logger.log("Using the following parameters:")
-    logger.log("username: {0}".format(username))
-    logger.log("get_data: {0}".format(get_data))
     logger.log("snapnums: {0}".format(snapnums))
     logger.log("size: {0}".format(size))
     logger.log("cluster: {0}".format(cluster))
@@ -90,6 +86,7 @@ def main(username,password,
     logger.log("min_secondtwo_mass_ratio: {0}".format(min_secondtwo_mass_ratio))
     logger.log("num_cpus: {0}".format(num_cpus))
     logger.log("profile: {0}".format(profile))
+    logger.log("datadir: {0}".format(datadir))
     logger.log("outdir: {0}".format(outdir))
     logger.log("overwrite: {0}".format(outdir))
     logger.log("verbose: {0}".format(verbose))
@@ -103,10 +100,6 @@ def main(username,password,
         if not os.path.isdir(directory):
             os.mkdir(directory)
             logger.log('Created {0}'.format(directory))
-        data_directory = os.path.join(directory,'data')
-        if not os.path.isdir(data_directory):
-            os.mkdir(data_directory)
-            logger.log('Created {0}'.format(data_directory))
         members_directory = os.path.join(directory,'members')
         if not os.path.isdir(members_directory):
             os.mkdir(members_directory)
@@ -115,11 +108,6 @@ def main(username,password,
         if not os.path.isdir(groups_directory):
             os.mkdir(groups_directory)
             logger.log('Created {0}'.format(groups_directory))
-    #
-    # Get Millennium Simulation cookies
-    #
-    cookies = millennium_query.get_cookies(username,password)
-    logger.log('Acquired login cookies')
     #
     # Set up simulation chunk boundaries
     #
@@ -144,15 +132,14 @@ def main(username,password,
     for snapnum,xbounds,ybounds,zbounds in \
       itertools.product(snapnums,boundaries,boundaries,boundaries):
         # Set-up a new Worker
-        job = worker.Worker(username,password,cookies,
-                            snapnum,xbounds,ybounds,zbounds,
-                            get_data=get_data,cluster=cluster,
+        job = worker.Worker(snapnum,xbounds,ybounds,zbounds,
+                            cluster=cluster,
                             use_dbscan=use_dbscan,neighborhood=neighborhood,bandwidth=bandwidth,
                             min_members=min_members,dwarf_limit=dwarf_limit,
                             crit_velocity=crit_velocity,annular_radius=annular_radius,
                             max_annular_mass_ratio=max_annular_mass_ratio,
                             min_secondtwo_mass_ratio=min_secondtwo_mass_ratio,
-                            outdir=outdir,overwrite=overwrite,
+                            datadir=datadir,outdir=outdir,overwrite=overwrite,
                             verbose=verbose,nolog=nolog)
         # Append to list of worker arguments
         jobs.append(job)
@@ -211,17 +198,8 @@ if __name__ == "__main__":
         prog=_PROG_NAME,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     #
-    # Required Parameters
-    #
-    parser.add_argument('--username',type=str,required=True,
-                        help="Username for Millennium Simulation access.")
-    parser.add_argument('--password',type=str,required=True,
-                        help="Password for Millennium Simulation access")
-    #
     # Simulation parameters
     #
-    parser.add_argument('--get_data',action='store_true',
-                        help='Re-download simulation data even if it already exists.')
     parser.add_argument('--snapnums',nargs="+",type=int,
                         default=np.arange(64),
                         help="snapnums to process. Default: All (0 to 63)")
@@ -275,10 +253,12 @@ if __name__ == "__main__":
                               "Default: None (use multiprocessing "
                               "on single machine)"))
     #
-    # Data output parameters
+    # Data parameters
     #
     parser.add_argument('--outdir',type=str,default='results',
                         help="directory to save results. Default: results/")
+    parser.add_argument('--datadir',type=str,default='data',
+                        help="directory where data lives. Default: data/")
     parser.add_argument('--overwrite',action='store_true',
                         help='Re-do analysis if member file and group file exists.')
     #
@@ -294,13 +274,12 @@ if __name__ == "__main__":
     # Parse the arguments and send to main function
     #
     args = parser.parse_args()
-    main(args.username,args.password,
-         get_data=args.get_data,snapnums=args.snapnums,size=args.size,
+    main(snapnums=args.snapnums,size=args.size,
          cluster=args.cluster,
          use_dbscan=args.use_dbscan,neighborhood=args.neighborhood,bandwidth=args.bandwidth,
          min_members=args.min_members,dwarf_limit=args.dwarf_limit,
          crit_velocity=args.crit_velocity,annular_radius=args.annular_radius,
          max_annular_mass_ratio=args.max_annular_mass_ratio,min_secondtwo_mass_ratio=args.min_secondtwo_mass_ratio,
          num_cpus=args.num_cpus,profile=args.profile,
-         outdir=args.outdir,overwrite=args.overwrite,
+         datadir=args.datadir,outdir=args.outdir,overwrite=args.overwrite,
          verbose=args.verbose,nolog=args.nolog,test=args.test)
