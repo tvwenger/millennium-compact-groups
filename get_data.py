@@ -101,12 +101,17 @@ def main(username,password,
     num = 0
     for snapnum,xbounds,ybounds,zbounds in \
       itertools.product(snapnums,boundaries,boundaries,boundaries):
+        num = num + 1
         job_time = time.time()
         # set up datafile
         mystring = "{0:02g}_{1:03g}_{2:03g}_{3:03g}".\
           format(snapnum,xbounds[0],ybounds[0],zbounds[0])
         datafile = os.path.join(outdir,'snapnum_{0:02g}'.format(snapnum),
                                 'data','data_{0}.csv'.format(mystring))
+        # Check if file already exists
+        if os.path.exists(datafile) and not overwrite:
+            print("Found: ({0}/{1}) - {2}".format(num,total,mystring))
+            continue
         # set up this query
         my_query = query.format(columns,table,snapnum,
                                 xbounds[0],xbounds[1],
@@ -121,7 +126,6 @@ def main(username,password,
         conn.wait()
         # Save the results
         conn.save(datafile)
-        num = num + 1
         print("Downloaded: ({0}/{1}) - {2} - Runtime: {3:.2f}s".format(num,total,mystring,time.time()-job_time))
     #
     # Clean up
