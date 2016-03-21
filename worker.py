@@ -166,7 +166,7 @@ class Worker:
         directory = os.path.join(outdir,"snapnum_{0:02g}".format(self.snapnum))
         self.datafile = os.path.join(datadir,'snapnum_{0:02g}'.format(self.snapnum),
                                      'data_{0}.csv'.format(my_string))
-        self.clusterfile = os.path.join(directory,'data','cluster_{0}.csv'.format(my_string))
+        self.clusterfile = os.path.join(directory,'cluster','cluster_{0}.csv'.format(my_string))
         self.membersfile = os.path.join(directory,'members','members_{0}.csv'.format(my_string))
         self.groupsfile = os.path.join(directory,'groups','groups_{0}.csv'.format(my_string))
         self.all_membersfile = os.path.join(directory,'members','all_members_{0}.csv'.format(my_string))

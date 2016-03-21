@@ -100,6 +100,10 @@ def main(snapnums=np.arange(64),size=100.,
         if not os.path.isdir(directory):
             os.mkdir(directory)
             logger.log('Created {0}'.format(directory))
+        cluster_directory = os.path.join(directory,'cluster')
+        if not os.path.isdir(cluster_directory):
+            os.mkdir(cluster_directory)
+            logger.log('Created {0}'.format(cluster_directory))
         members_directory = os.path.join(directory,'members')
         if not os.path.isdir(members_directory):
             os.mkdir(members_directory)
