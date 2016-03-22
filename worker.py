@@ -41,7 +41,6 @@ import pandas
 from sklearn.cluster import MeanShift,DBSCAN
 from scipy.spatial import cKDTree
 # Other utilities
-import millennium_query
 import compact_group
 import cg_logger
 
