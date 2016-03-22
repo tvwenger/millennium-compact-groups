@@ -136,9 +136,9 @@ class CompactGroup:
         of neighboring galaxies within the surrounding annulus to the
         total virial mass of all galaxies within the sphere
         """
-        # total mass
-        sphere_mass = np.sum(self.neighbors['mvir']) + np.sum(self.members['mvir'])
-        sphere_mass = sphere_mass / (4.*np.pi/3. * radius**3.)
+        # mass of cluster
+        sphere_mass = np.sum(self.members['mvir'])
+        sphere_mass = sphere_mass / (4.*np.pi/3. * self.radius**3.)
         # mass in annulus
         annulus_mass = np.sum(self.neighbors['mvir'])
         annulus_mass = annulus_mass/(4.*np.pi/3. * (radius**3. - self.radius**3.))
