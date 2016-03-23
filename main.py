@@ -49,7 +49,7 @@ def main(snapnums=np.arange(64),size=100.,
          cluster=False,
          use_dbscan=False,neighborhood=0.05,bandwidth=0.1,
          min_members=3,dwarf_limit=0.05,crit_velocity=1000.,
-         annular_radius=1.,max_annular_mass_ratio=0.0001,min_secondtwo_mass_ratio=0.1,
+         annular_radius=1.,max_annular_mass_ratio=1.e-4,min_secondtwo_mass_ratio=0.1,
          num_cpus=1,profile=None,
          datadir='data',outdir='results',overwrite=False,
          verbose=False,nolog=False,test=False):
@@ -237,9 +237,9 @@ if __name__ == "__main__":
     parser.add_argument('--annular_radius',type=float,default=1.0,
                         help=('Size (in Mpc/h) of outer annular radius '
                               'for annular mass ratio calculation. Default: 1.0'))
-    parser.add_argument('--max_annular_mass_ratio',type=float,default=0.0001,
+    parser.add_argument('--max_annular_mass_ratio',type=float,default=1.e-4,
                         help=('Maximum allowed value for the ratio of mass '
-                              'in annulus to total mass. Default: 0.0001'))
+                              'in annulus to total mass. Default: 1.e-4'))
     parser.add_argument('--min_secondtwo_mass_ratio',type=float,default=0.1,
                         help=('Minimum allowed value for the ratio of mass '
                               'of the second two most massive galaxies to '

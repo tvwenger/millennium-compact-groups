@@ -136,7 +136,7 @@ class Worker:
                  cluster=False,
                  use_dbscan=False,neighborhood=0.05,bandwidth=0.1,
                  min_members=3,dwarf_limit=0.05,crit_velocity=1000.,
-                 annular_radius=1.,max_annular_mass_ratio=0.0001,min_secondtwo_mass_ratio=0.1,
+                 annular_radius=1.,max_annular_mass_ratio=1.e-4,min_secondtwo_mass_ratio=0.1,
                  datadir='data',outdir='results',overwrite=False,
                  verbose=False,nolog=False):
         #
