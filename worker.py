@@ -369,7 +369,7 @@ class Worker:
         groups = [self.good_groups,self.groups]
         for filename,group in zip(filenames,groups):
             #          group,    mem,     x,         y,         z,         velX,      velY,      velZ,     vel,        mag_r,     mvir,       stelMass,   treeID,  is_dwarf, is_flyby
-            fmt_row = "{0:>16d}, {1:>15d}, {2:>9.5f}, {3:>9.5f}, {4:>9.5f}, {5:>12.5f}, {6:>12.5f}, {7:>12.5f}, {8:>12.5f}, {9:>9.5f}, {10:>12.5f}, {11:>11.5f}, {12:>15d}, {13:>8}, {14:>8}\n"
+            fmt_row = "{0:>16d}, {1:>15}, {2:>9.5f}, {3:>9.5f}, {4:>9.5f}, {5:>12.5f}, {6:>12.5f}, {7:>12.5f}, {8:>12.5f}, {9:>9.5f}, {10:>12.5f}, {11:>11.5f}, {12:>15}, {13:>8}, {14:>8}\n"
             fmt_hdr = "{0:>16}, {1:>15}, {2:>9}, {3:>9}, {4:>9}, {5:>12}, {6:>12}, {7:>12}, {8:>12}, {9:>9}, {10:>12}, {11:>11}, {12:>15}, {13:>8}, {14:>8}\n"
             with open(filename,'w') as f:
                 f.write(fmt_hdr.format("group_id","member_id","x","y",
