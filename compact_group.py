@@ -120,7 +120,10 @@ class CompactGroup:
         excluding dwafs and flybys
         """
         good = ((~self.members['is_dwarf'])&(~self.members['is_flyby']))
-        self.avg_mvir = np.mean(self.members['mvir'][good])
+        if np.sum(good) == 0:
+            self.avg_mvir = np.nan
+        else:
+            self.avg_mvir = np.mean(self.members['mvir'][good])
 
     def calc_avg_stellarmass(self):
         """
@@ -128,7 +131,10 @@ class CompactGroup:
         excluding dwafs and flybys
         """
         good = ((~self.members['is_dwarf'])&(~self.members['is_flyby']))
-        self.avg_stellarmass = np.mean(self.members['stellarMass'][good])
+        if np.sum(good) == 0:
+            self.avg_stellarmass = np.nan
+        else:
+            self.avg_stellarmass = np.mean(self.members['stellarMass'][good])
 
     def calc_annular_mass_ratio(self,radius):
         """
